@@ -13,11 +13,14 @@ import com.tech.kj.web.dto.RegisterUserDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,7 +28,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenProvider jwtTokenUtil;
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userJpaRepository;
 
@@ -35,7 +38,7 @@ public class AuthController {
             PasswordEncoder passwordEncoder,
             UserRepository userJpaRepository) {
         this.authenticationManager = authenticationManager;
-        this.jwtTokenProvider = jwtTokenProvider;
+        this.jwtTokenUtil = jwtTokenProvider;
         this.passwordEncoder = passwordEncoder;
         this.userJpaRepository = userJpaRepository;
     }
@@ -43,17 +46,14 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<JwtAccessTokenResponse> login(@RequestBody LoginDto loginDto) {
 
-        var user =
-                authenticationManager.authenticate(
-                        new UsernamePasswordAuthenticationToken(
-                                loginDto.getUserName(), loginDto.getPassword()));
-
-        var roles =
-                user.getAuthorities().stream()
-                        .map(GrantedAuthority::getAuthority)
-                        .collect(Collectors.toSet());
-
-        var token = jwtTokenProvider.createToken(user.getName(), roles);
+        final Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginDto.getUserName(),
+                        loginDto.getPassword()
+                )
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        final String token = jwtTokenUtil.generateToken(authentication);
         return ResponseEntity.ok(JwtAccessTokenResponse.builder().access_token(token).build());
     }
 
@@ -91,12 +91,6 @@ public class AuthController {
         contactEntity.setUser(user);
         emailEntity.setUser(user);
         this.userJpaRepository.save(user);
-
-        //
-
-        var token =
-                jwtTokenProvider.createToken(user.getUsername(), user.getRoles().stream().map(e->e.getAuthority()).collect(Collectors.toSet()));
-
-        return ResponseEntity.ok(JwtAccessTokenResponse.builder().access_token(token).build());
+        return ResponseEntity.created(URI.create("/api/v1/auth/login")).build();
     }
 }

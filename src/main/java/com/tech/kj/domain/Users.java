@@ -27,10 +27,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Setter
 @Getter
-@SecondaryTable(
-        name = "user_relevance",
-        pkJoinColumns = @PrimaryKeyJoinColumn(name = "user_id", referencedColumnName = "id"))
-public class Users extends BaseEntity implements UserDetails {
+public class Users extends BaseEntity{
     private String firstName;
     private String lastName;
     private String middleName;
@@ -48,47 +45,13 @@ public class Users extends BaseEntity implements UserDetails {
     private boolean isDeleted = false;
 
 
-    @Enumerated(EnumType.STRING)
-    @ElementCollection(fetch = FetchType.EAGER, targetClass = UserRole.class)
-    private Set<UserRole> roles;
-    @Column(table = "user_relevance")
-    private Integer relevance;
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream().collect(Collectors.toSet());
-    }
-
-    @Override
-    public String getPassword() {
-        return password;
-    }
-
-    @Override
-    public String getUsername() {
-        System.out.println(emails);
-        return  emails.stream().filter(e-> e.isPrimary()).map(e->e.getEmail()).findFirst().get();
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return true;
-    }
-
+    @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @JoinTable(name = "USER_ROLES",
+            joinColumns = {
+                    @JoinColumn(name = "USER_ID")
+            },
+            inverseJoinColumns = {
+                    @JoinColumn(name = "ROLE_ID") })
+    private Set<Roles> roles;
 
 }

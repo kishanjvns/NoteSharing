@@ -1,6 +1,7 @@
 package com.tech.kj.web.dto;
 
 
+import com.tech.kj.domain.Roles;
 import com.tech.kj.domain.UserRole;
 import lombok.*;
 
@@ -22,7 +23,7 @@ public class RegisterUserDto {
     private boolean isPrimaryEmail;
     private String contact;
     private boolean isPrimaryContact;
-    private Set<UserRole> roles;
+    private Set<Roles> roles;
 
     public boolean getIsPrimaryEmail() {
         return isPrimaryEmail;

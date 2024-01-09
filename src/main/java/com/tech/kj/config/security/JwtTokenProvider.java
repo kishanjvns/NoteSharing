@@ -8,86 +8,88 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-
+import io.jsonwebtoken.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 @Component
 public class JwtTokenProvider {
     private UserDetailsService userDetailsServiceImpl;
 
     @Value("${application.security.jwt.secret-key}")
-    private String secretKey;
+    private String SIGNING_KEY;
     @Value("${application.security.jwt.expiration}")
-    private long jwtExpiration;
+    private long TOKEN_VALIDITY;
+
+    @Value("${jwt.authorities.key}")
+    public String AUTHORITIES_KEY;
 
 
-    public JwtTokenProvider(UserDetailsService userDetailsServiceImpl) {
-        this.userDetailsServiceImpl = userDetailsServiceImpl;
+    public String getUsernameFromToken(String token) {
+        return getClaimFromToken(token, Claims::getSubject);
     }
 
-    public String createToken(String username, Set<String> roles) {
-        var claims = Jwts.claims().setSubject(username);
+    public Date getExpirationDateFromToken(String token) {
+        return getClaimFromToken(token, Claims::getExpiration);
+    }
 
-        claims.put("roles", roles);
+    public <T> T getClaimFromToken(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = getAllClaimsFromToken(token);
+        return claimsResolver.apply(claims);
+    }
 
-        var now = new Date();
-        var expiration = new Date(now.getTime() + jwtExpiration);
+    private Claims getAllClaimsFromToken(String token) {
+        return Jwts.parser()
+                .setSigningKey(SIGNING_KEY)
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    private Boolean isTokenExpired(String token) {
+        final Date expiration = getExpirationDateFromToken(token);
+        return expiration.before(new Date());
+    }
+
+    public String generateToken(Authentication authentication) {
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
 
         return Jwts.builder()
-                .setClaims(claims)
-                .setIssuedAt(now)
-                .setExpiration(expiration)
-                .signWith(getKeyFromSecret())
+                .setSubject(authentication.getName())
+                .claim(AUTHORITIES_KEY, authorities)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + TOKEN_VALIDITY*1000))
+                .signWith(SignatureAlgorithm.HS256, SIGNING_KEY)
                 .compact();
     }
 
-    public Authentication getAuthentication(String token) {
-        var userDetails = userDetailsServiceImpl.loadUserByUsername(getSubject(token));
-        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        final String username = getUsernameFromToken(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
 
-    public String getSubject(String token) {
-        var parsed =
-                Jwts.parserBuilder().setSigningKey(getKeyFromSecret()).build().parseClaimsJws(token);
+    UsernamePasswordAuthenticationToken getAuthenticationToken(final String token, final Authentication existingAuth, final UserDetails userDetails) {
 
-        return parsed.getBody().getSubject();
-    }
+        final JwtParser jwtParser = Jwts.parser().setSigningKey(SIGNING_KEY);
 
-    public String resolveToken(HttpServletRequest request) {
-        var bearerToken = request.getHeader("Authorization");
+        final Jws<Claims> claimsJws = jwtParser.parseClaimsJws(token);
 
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
-    }
+        final Claims claims = claimsJws.getBody();
 
-    public boolean validateToken(String token) {
-        try {
-            Jwts.parserBuilder().setSigningKey(getKeyFromSecret()).build().parseClaimsJws(token);
-            return true;
-        } catch (SignatureException ex) {
-            throw new SignatureException("Invalid JWT signature");
-        } catch (MalformedJwtException ex) {
-            throw new MalformedJwtException("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            throw new ExpiredJwtException(null, null, "Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            throw new UnsupportedJwtException("Unsupported JWT token");
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("JWT claims string is empty.");
-        }
-    }
+        final Collection<? extends GrantedAuthority> authorities =
+                Arrays.stream(claims.get(AUTHORITIES_KEY).toString().split(","))
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
 
-    private Key getKeyFromSecret() {
-        var decodedSecret = Base64.getDecoder().decode(secretKey);
-        return Keys.hmacShaKeyFor(decodedSecret);
+        return new UsernamePasswordAuthenticationToken(userDetails, "", authorities);
     }
 }
