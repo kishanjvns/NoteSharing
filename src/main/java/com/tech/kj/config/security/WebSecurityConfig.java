@@ -24,14 +24,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 @EnableWebSecurity
-//@EnableMethodSecurity(securedEnabled = true)
-@EnableGlobalMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class WebSecurityConfig implements WebMvcConfigurer {
     private static final String[] WHITE_LIST_URL = {"/api/v1/auth/**"};
     private final JwtFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
-    //private final LogoutHandler logoutHandler;
     private final JwtTokenProvider jwtTokenProvider;
     private final AccessDeniedHandler accessDeniedHandler;
     private final AuthenticationEntryPoint authenticationEntryPoint;
@@ -43,6 +41,7 @@ public class WebSecurityConfig implements WebMvcConfigurer {
                 .authorizeHttpRequests(req ->
                         req.requestMatchers(WHITE_LIST_URL)
                                 .permitAll()
+                                .requestMatchers("/api/v1/**").hasAnyRole("USER","ADMIN")
                                 .anyRequest()
                                 .authenticated()
                 )
@@ -51,14 +50,8 @@ public class WebSecurityConfig implements WebMvcConfigurer {
                 })
                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
-                /*.logout(logout ->
-                        logout.logoutUrl("/api/v1/auth/logout")
-                                .addLogoutHandler(logoutHandler)
-                                .logoutSuccessHandler((request, response, authentication) -> SecurityContextHolder.clearContext())
-                )*/
-                .exceptionHandling(config-> config.accessDeniedHandler(accessDeniedHandler).authenticationEntryPoint(authenticationEntryPoint)).build();
 
-        //return http.build();
+                .exceptionHandling(config-> config.accessDeniedHandler(accessDeniedHandler).authenticationEntryPoint(authenticationEntryPoint)).build();
     }
 
     @Bean

@@ -2,7 +2,6 @@ package com.tech.kj.web.dto;
 
 
 import com.tech.kj.domain.Roles;
-import com.tech.kj.domain.UserRole;
 import lombok.*;
 
 import java.util.Set;

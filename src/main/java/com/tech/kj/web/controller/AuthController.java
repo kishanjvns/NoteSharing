@@ -5,7 +5,6 @@ import com.tech.kj.config.security.JwtTokenProvider;
 import com.tech.kj.domain.Contacts;
 import com.tech.kj.domain.Emails;
 import com.tech.kj.domain.Users;
-import com.tech.kj.domain.UserRole;
 import com.tech.kj.repository.UserRepository;
 import com.tech.kj.web.dto.JwtAccessTokenResponse;
 import com.tech.kj.web.dto.LoginDto;
@@ -14,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -61,14 +58,6 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<JwtAccessTokenResponse> register(
             @RequestBody RegisterUserDto request) {
-        //var userExists = userJpaRepository.fetchedByEmail(request.getEmail());
-
-        /*if (userExists.isEmpty()) {
-            throw new UserExistsException(
-                    String.format("Username %s already in use.", request.getUserName()));
-        }*/
-
-        //
         Contacts contactEntity = Contacts.builder()
                 .isVerified(true)
                 .isPrimary(request.getIsPrimaryContact())

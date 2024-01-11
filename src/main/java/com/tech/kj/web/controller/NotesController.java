@@ -15,7 +15,8 @@ import java.util.Optional;
 public class NotesController {
 
     @GetMapping
-    @PreAuthorize("hasRole('USER')")
+    //@PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAuthority('ROLE_USER')")
     public ResponseEntity<Optional<String>> hello(){
         return ResponseEntity.status(HttpStatus.OK).body(Optional.of("hello"));
     }
